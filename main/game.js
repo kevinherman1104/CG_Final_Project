@@ -26,6 +26,7 @@ class Game{
 		this.score = 0;
 		this.debug = false;
 		this.debugPhysics = false;
+		this.cameraFade = 0.05;
 		
 		this.messages = { 
 			text:[ 
@@ -45,14 +46,14 @@ class Game{
 		document.body.appendChild( this.container );
 		
 		const sfxExt = SFX.supportsAudioType('mp3') ? 'mp3' : 'ogg';
-        
 		const game = this;
-		this.anims = ["run", "gather-objects", "look-around"];
+		this.anims = ["gather-objects", "look-around", "push-button", "run", "stumble-backwards"];
 		
 		this.assetsPath = '../assets/';
 		
 		const options = {
 			assets:[
+                `${this.assetsPath}sfx/gliss.${sfxExt}`
 			],
 			oncomplete: function(){
 				game.init();
@@ -64,14 +65,33 @@ class Game{
 		
 		this.mode = this.modes.PRELOAD;
 		
-
+		document.getElementById("camera-btn").onclick = function(){ game.switchCamera(); };
+		document.getElementById("briefcase-btn").onclick = function(){ game.toggleBriefcase(); };
+		
 		this.clock = new THREE.Clock();
 
+		//this.init();
+		//this.animate();
 		const preloader = new Preloader(options);
 		
 		window.onError = function(error){
 			console.error(JSON.stringify(error));
 		}
+	}
+	
+	switchCamera(fade=0.05){
+		const cams = Object.keys(this.player.cameras);
+		cams.splice(cams.indexOf('active'), 1);
+		let index;
+		for(let prop in this.player.cameras){
+			if (this.player.cameras[prop]==this.player.cameras.active){
+				index = cams.indexOf(prop) + 1;
+				if (index>=cams.length) index = 0;
+				this.player.cameras.active = this.player.cameras[cams[index]];
+				break;
+			}
+		}
+		this.cameraFade = fade;
 	}
 	
 	initSfx(){
@@ -154,6 +174,7 @@ class Game{
 			
 			game.createCameras();
 			game.loadNextAnim(loader);
+			game.createDummyEnvironment();
 		} );
 		
 		this.renderer = new THREE.WebGLRenderer( { antialias: true } );
@@ -161,6 +182,20 @@ class Game{
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 		this.renderer.shadowMap.enabled = true;
 		this.container.appendChild( this.renderer.domElement );
+		
+		//this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
+		//this.controls.target.set( 0, 60, 0 );
+		//this.controls.update();
+		
+		/*if ('ontouchstart' in window){
+			this.renderer.domElement.addEventListener('touchstart', function(evt){ game.tap(evt); });
+			this.renderer.domElement.addEventListener('touchmove', function(evt){ game.tap(evt); });
+			this.renderer.domElement.addEventListener('touchend', function(evt){ game.tap(evt); });
+		}else{
+			this.renderer.domElement.addEventListener('mousedown', function(evt){ game.tap(evt); });
+			this.renderer.domElement.addEventListener('mousemove', function(evt){ game.move(evt); });
+			this.renderer.domElement.addEventListener('mouseup', function(evt){ game.up(evt); });
+		}*/
 			
 		window.addEventListener( 'resize', function(){ game.onWindowResize(); }, false );
 
@@ -171,14 +206,35 @@ class Game{
 		}
 	}
 
+	createDummyEnvironment(){
+		const env = new THREE.Group();
+		env.name = "Environment";
+		this.scene.add(env);
+		
+		const geometry = new THREE.BoxBufferGeometry( 150, 150, 150 );
+		const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+		
+		for(let x=-1000; x<1000; x+=300){
+			for(let z=-1000; z<1000; z+=300){
+				const block = new THREE.Mesh(geometry, material);
+				block.position.set(x, 75, z);
+				env.add(block);
+			}
+		}
+		
+		this.environmentProxy = env;
+	}
+	
 	playerControl(forward, turn){
 		//console.log(`playerControl(${forward}), ${turn}`);
+        turn = -turn; //Flip direction
         
 		if (forward>0){
 			if (this.player.action!='walk') this.action = 'walk';
 		}else{
 			if (this.player.action=="walk") this.action = 'look-around';
 		}
+        
 		if (forward==0 && turn==0){
 			delete this.player.move;
 		}else{
@@ -187,29 +243,27 @@ class Game{
 	}
 	
 	createCameras(){
-		const offset = new THREE.Vector3(0, 60, 0);
 		const front = new THREE.Object3D();
 		front.position.set(112, 100, 200);
-		front.quaternion.set(0.07133122876303646, -0.17495722675648318, -0.006135162916936811, -0.9819695435118246);
 		front.parent = this.player.object;
 		const back = new THREE.Object3D();
 		back.position.set(0, 100, -250);
-		back.quaternion.set(-0.001079297317118498, -0.9994228131639347, -0.011748701462123836, -0.031856610911161515);
 		back.parent = this.player.object;
 		const wide = new THREE.Object3D();
 		wide.position.set(178, 139, 465);
-		wide.quaternion.set(0.07133122876303646, -0.17495722675648318, -0.006135162916936811, -0.9819695435118246);
 		wide.parent = this.player.object;
 		const overhead = new THREE.Object3D();
 		overhead.position.set(0, 400, 0);
-		overhead.quaternion.set(0.02806727427333993, 0.7629212874133846, 0.6456029820939627, 0.018977008134915086);
 		overhead.parent = this.player.object;
 		const collect = new THREE.Object3D();
 		collect.position.set(40, 82, 94);
-		collect.quaternion.set(0.07133122876303646, -0.17495722675648318, -0.006135162916936811, -0.9819695435118246);
 		collect.parent = this.player.object;
 		this.player.cameras = { front, back, wide, overhead, collect };
-		game.activeCamera = this.player.cameras.front;	
+		game.activeCamera = this.player.cameras.wide;
+		game.cameraFade = 0.1;
+		setTimeout( function(){ 
+			game.activeCamera = game.player.cameras.back; 
+		}, 2000)
 	}
 	
 	loadNextAnim(loader){
@@ -225,17 +279,6 @@ class Game{
 				game.mode = game.modes.ACTIVE;
 			}
 		});	
-	}
-	
-	createCannonTrimesh(geometry){
-		if (!geometry.isBufferGeometry) return null;
-		
-		const posAttr = geometry.attributes.position;
-		const vertices = geometry.attributes.position.array;
-		let indices = [];
-		for(let i=0; i<posAttr.count; i++) indices.push(i);
-		
-		return new CANNON.Trimesh(vertices, indices);
 	}
 	
 	getMousePosition(clientX, clientY){
@@ -311,22 +354,62 @@ class Game{
 	set action(name){
 		const anim = this.player[name];
 		const action = this.player.mixer.clipAction( anim,  this.player.root );
-        action.time = 0;
 		this.player.mixer.stopAllAction();
-        if (this.player.action == 'gather-objects'){
-            delete this.player.mixer._listeners['finished'];
-        }
-        if (name=='gather-objects'){
-            action.loop = THREE.LoopOnce;
-            const game = this;
-            this.player.mixer.addEventListener('finished', function(){ 
-                console.log("gather-objects animation finished");
-                game.action = 'look-around'; 
-            });
-        }
 		this.player.action = name;
 		action.fadeIn(0.5);	
 		action.play();
+	}
+	
+	movePlayer(dt){
+		const pos = this.player.object.position.clone();
+		pos.y += 60;
+		let dir = this.player.object.getWorldDirection();
+		let raycaster = new THREE.Raycaster(pos, dir);
+		let blocked = false;
+		
+		for(let box of this.environmentProxy.children){
+			const intersect = raycaster.intersectObject(box);
+			if (intersect.length>0){
+				if (intersect[0].distance<50){
+					blocked = true;
+					break;
+				}
+			}
+		}
+		
+		if (!blocked && this.player.move.forward > 0) this.player.object.translateZ(dt*100);
+		
+		//cast left
+		dir.set(-1,0,0);
+		dir.applyMatrix4(this.player.object.matrix);
+		dir.normalize();
+		raycaster = new THREE.Raycaster(pos, dir);
+		
+		for(let box of this.environmentProxy.children){
+			const intersect = raycaster.intersectObject(box);
+			if (intersect.length>0){
+				if (intersect[0].distance<80){
+					this.player.object.translateX(-(intersect[0].distance-80));
+					break;
+				}
+			}
+		}
+		
+		//cast right
+		dir.set(1,0,0);
+		dir.applyMatrix4(this.player.object.matrix);
+		dir.normalize();
+		raycaster = new THREE.Raycaster(pos, dir);
+		
+		for(let box of this.environmentProxy.children){
+			const intersect = raycaster.intersectObject(box);
+			if (intersect.length>0){
+				if (intersect[0].distance<80){
+					this.player.object.translateX(intersect[0].distance-80);
+					break;
+				}
+			}
+		}
 	}
 	
 	animate() {
@@ -338,13 +421,15 @@ class Game{
 		if (this.player.mixer!=undefined && this.mode==this.modes.ACTIVE) this.player.mixer.update(dt);
 		
 		if (this.player.move!=undefined){
-			if (this.player.move.forward>0) this.player.object.translateZ(dt*100);
+			this.movePlayer(dt);
 			this.player.object.rotateY(this.player.move.turn*dt);
 		}
 		
 		if (this.player.cameras!=undefined && this.player.cameras.active!=undefined){
-			this.camera.position.lerp(this.player.cameras.active.getWorldPosition(new THREE.Vector3()), 0.05);
-			this.camera.quaternion.slerp(this.player.cameras.active.getWorldQuaternion(new THREE.Quaternion()), 0.05);
+			this.camera.position.lerp(this.player.cameras.active.getWorldPosition(new THREE.Vector3()), this.cameraFade);
+			const pos = this.player.object.position.clone();
+			pos.y += 60;
+			this.camera.lookAt(pos);
 		}
 		
 		this.renderer.render( this.scene, this.camera );
