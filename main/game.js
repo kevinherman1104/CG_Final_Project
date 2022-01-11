@@ -212,7 +212,7 @@ class Game{
 		this.scene.add(env);
 		
 		const geometry = new THREE.BoxBufferGeometry( 150, 150, 150 );
-		const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+		const material = new THREE.MeshBasicMaterial( { color: 0xff0000 } );
 		
 		for(let x=-1000; x<1000; x+=300){
 			for(let z=-1000; z<1000; z+=300){
