@@ -153,6 +153,7 @@ class Game{
 						leftProxy.position = left.position.clone();
 						rightProxy.position = right.position.clone();
 					}))
+					alert("Congratulations! You have completed the game!");
 					break;
                 case 'collect':
                     this.activeCamera = this.player.cameras.collect;
@@ -309,7 +310,7 @@ class Game{
             const scale = 0.2;
 			object.scale.set(scale, scale, scale);
 			object.name = "usb";
-            object.position.set(-416, 0.8, -472);
+            object.position.set(-205, 12, -1992);
             object.castShadow = true;
 			
             game.collect.push(object);
